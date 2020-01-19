@@ -6,7 +6,7 @@ from heapq import heappush, heappop
 
 import sys
 import resource
-soft, hard = 10 * 10**9, 10 * 10**9
+soft, hard = 5 * 10**9, 5 * 10**9
 # soft, hard = 10**8, 10**8   # uncommenting this allows program to finish
 resource.setrlimit(resource.RLIMIT_AS,(soft, hard))
 
@@ -18,6 +18,8 @@ class Solution:
         LEFT: [UP, DOWN],
         RIGHT: [UP, DOWN]
     }
+    def __init__(self, debug=True):
+        self.debug = debug
 
     def get_minnor_position(self, p1, p2, p3):
         assert (p1['x'] == p2['x']) ^ (p1['y'] == p2['y'])
@@ -46,12 +48,12 @@ class Solution:
 
     def solve(self, grid):
         self.grid = grid
-        self.graph = Graph(len(self.grid.minors) + 2)
+        self.graph = Graph( 4 * len(self.grid.minors) + 2)
         self.generate_graph()
-        end_p = (self.grid.col, 0)
+        end_p = (self.grid.col, 0, RIGHT)
         if  end_p not in self.nodes_by_x_y:
             return None
-        start = self.nodes_by_x_y[(-1, 0)]
+        start = self.nodes_by_x_y[(-1, 0, RIGHT)]
         path, min_dist = self.graph.shorest_path(start, self.nodes_by_x_y[end_p])
 
         grid_path = []
@@ -59,7 +61,6 @@ class Solution:
         for i, p in enumerate(path):
             node = self.nodes[p.w]
             if i != 0:
-                print(f"{path[i-1].w, p.w, p.v}")
                 node['minnor'] = self.get_minnor_position(last_node, node, self.nodes[p.v])
             grid_path.append(node)
             if i == len(path) - 1:
@@ -82,38 +83,30 @@ class Solution:
         self.visited_mirror_by_xy[(point['x'],point['y'])] = point
         self.nodes = []
         self.nodes_by_x_y = {}
-        for i, m in enumerate(self.grid.minors):
-            self.nodes.append(
-                {'x': m[0], 'y': m[1]}
-            )
-            self.nodes_by_x_y[m] = i
+        for m in self.grid.minors:
+            for d in [UP, DOWN, LEFT, RIGHT]:
+                self.nodes.append(
+                    {'x': m[0], 'y': m[1], 'd': d}
+                )
+                self.nodes_by_x_y[(m[0], m[1], d)] = len(self.nodes) - 1
         self.nodes.append(point)
-        self.nodes_by_x_y[(point['x'], point['y'] )] = len(self.nodes) - 1
-        self.nodes.append({'x': self.grid.col, 'y': 0})
-        self.nodes_by_x_y[(self.grid.col, 0)] = len(self.nodes) - 1
+        self.nodes_by_x_y[(point['x'], point['y'], point['d'])] = len(self.nodes) - 1
+        self.nodes.append({'x': self.grid.col, 'y': 0, 'd': RIGHT})
+        self.nodes_by_x_y[(self.grid.col, 0, RIGHT)] = len(self.nodes) - 1
         self.stack = []
         self.stack.append(point)
         while self.stack:
             point = self.stack.pop()
             if point['type'] == MINNOR or point['type'] == SUCCEED:
-                if (point["x"], point["y"]) not in self.nodes_by_x_y:
-                    self.nodes.append(point)
                 if self.mirror_stack:
-                    self.check_mirro_stack()
                     last_mirror = self.mirror_stack[-1]
                     try:
-                        self.check_mirro_stack()
                         edge = self.cal_edge(self.mirror_stack[-2], last_mirror, point)
                         self.graph.add_edge(edge)
-                        try:
-                            self.check_graph(point)
-                        except Exception as e:
-                            pass
                     except IndexError:
                         edge = self.cal_edge(None, last_mirror, point)
                         self.graph.add_edge(edge)
                 self.mirror_stack.append(point)
-                self.check_mirro_stack()
                 self.visited_mirror_by_xy[(point['x'], point['y'])] = True
             next_points = self.get_next_points(point['x'], point['y'], point['d'])
             if not next_points:
@@ -125,6 +118,8 @@ class Solution:
 
 
     def check_graph(self, p):
+        if not self.debug:
+            return
         start = self.nodes_by_x_y[(-1, 0)]
         c = self.nodes_by_x_y[(p['x'], p['y'])]
         path, min_dist = self.graph.shorest_path(start, c)
@@ -134,7 +129,6 @@ class Solution:
         for i, p in enumerate(path):
             node = self.nodes[p.w]
             if i != 0:
-                print(f"{path[i-1].w, p.w, p.v}")
                 node['minnor'] = self.get_minnor_position(last_node, node, self.nodes[p.v])
             grid_path.append(node)
             if i == len(path) - 1:
@@ -142,6 +136,8 @@ class Solution:
             last_node = node
 
     def check_mirro_stack(self):
+        if not self.debug:
+            return
         if len(self.mirror_stack) >=3:
             for i in range(len(self.mirror_stack) - 2):
                 p1 = self.mirror_stack[i]
@@ -172,7 +168,7 @@ class Solution:
             wt = abs(p2['y'] - p1['y'])
         else:
             wt = abs(p2['x'] - p1['x'])
-        return Edge(self.nodes_by_x_y[(p1['x'], p1['y'])], self.nodes_by_x_y[(p2['x'], p2['y'])], wt)
+        return Edge(self.nodes_by_x_y[(p1['x'], p1['y'], p1['d'])], self.nodes_by_x_y[(p2['x'], p2['y'], p2['d'])], wt)
 
     def get_next_points(self, x, y, direction):
         while True:
@@ -312,7 +308,7 @@ class Path:
 
 def solve(data):
     grid = get_grid_from_data(data)
-    sol = Solution()
+    sol = Solution(debug=False)
     try:
         res = sol.solve(grid)
     except InvalidSetGridError as e:
@@ -322,9 +318,9 @@ def solve(data):
 
 if __name__ == '__main__':
     # peek_maps()
-    fn = "m12.json"
-    data = get_single_data_from_file(fn)
-    print(solve(data))
+    # fn = "m14.json"
+    # data = get_single_data_from_file(fn)
+    # print(solve(data))
 
 
-    # get_solutions(solve)
+    get_solutions(solve)

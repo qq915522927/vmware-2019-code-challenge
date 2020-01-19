@@ -77,7 +77,7 @@ def get_solutions(solution_func):
     output = {}
     output['solutions'] = []
     output['name'] = 'tommy'
-    skip_list = ['m29.json']
+    skip_list = ['m29.json', 'm30.json']
     # skip_list = []
     for filename in fs:
         gc.collect()
